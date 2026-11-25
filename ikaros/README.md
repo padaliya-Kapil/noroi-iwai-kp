@@ -1,7 +1,8 @@
 # ΙΚΑΡΟΣ (Ikaros)
 
-An 85-second collage film of the Icarus myth, drawn, animated and scored entirely in code: no image files, no fonts, no samples, no found images.
-1920×1080, 24 fps, drawn on twos (12 drawings a second), 16 shots of two bars each at 90 BPM. The score is instrumental.
+A 133-second collage film of the Icarus myth, drawn, animated and scored entirely in code: no image files, no fonts, no samples, no found images.
+Sixteen scenes are told as a silent film, with nine intertitle cards between them carrying short passages of Ovid (*Metamorphoses* VIII), freely translated; the letters are cut-paper strokes drawn by code, not a font.
+1920×1080, 24 fps, drawn on twos (12 drawings a second), 16 scenes and 9 intertitles of two bars each at 90 BPM. The score is instrumental.
 
 The look is a paper collage: Attic black-figure puppets cut from black paper with incisions to the clay colour and brass fasteners at the joints,
 torn and scissor-cut papers (parchment, bone, stone blue, fired clay, sepia engraving, an indigo sea), and gold leaf for the sun alone.
@@ -44,6 +45,8 @@ python ikaros/render.py s07 --preview 0,20,40   # a contact sheet of some drawin
 | `film.py` | The timeline and the story, shot by shot |
 | `collage.py` | The paper kit: torn and cut edges, papers, engraving, halftone, gold leaf, black-figure paper, shadows, a camera over larger pages, hand-placed jitter |
 | `figure.py` | Black-figure puppets: modelled limbs, poses, turning heads, tunic and robe, crown; wings of cut-paper feathers on a reed, wax |
+| `letters.py` | The cut-paper alphabet for the intertitles: inscriptional capitals as monoline strokes |
+| `shots/card.py` | The intertitles (`c01`..`c09`) and their texts |
 | `shotkit.py` | Shared pieces: winged and wingless figures, gulls, stone walls, cliff, the Labyrinth, candle and glow, splash, falling feathers, sea, sun, label |
 | `shots/` | One module per shot: a cached static page and `draw(d)` for drawing d |
 | `music.py` | Lyre, aulos, frame drum, finger cymbals, drone, and the sounds of paper, wings, wax, wind, sea and splash, timed from the shots |

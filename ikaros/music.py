@@ -15,19 +15,17 @@ DRY = np.zeros((2, NS)); WET = np.zeros((2, NS))
 
 
 def hz(m): return 440. * 2 ** ((m - 69) / 12)
-def bar(b, beat=0.): return b * BAR + beat * BEAT
-def shot(i, t=0.): return (i - 1) * SHOT + t
+SCENES = ['s01', 's02', 's03', 's04', 's05', 's06', 's07', 's08', 's09', 's10', 's11', 's12', 's13', 's14', 's15']   # the score was written against these, two bars each
+def at(sid, t=0.): return film.START[sid] / film.FPS + t
+def shot(i, t=0.): return at(SCENES[i - 1], t)                                # scene i of the score, wherever the cut has put it
+def bar(b, beat=0.): return shot(b // 2 + 1, (b % 2) * BAR + beat * BEAT)        # bar b of the score, inside its scene
 def tt(n): return np.arange(n) / SR
 def bp(x, lo, hi, order=2): return sosfilt(butter(order, [lo, hi], 'band', fs=SR, output='sos'), x)
 def lp(x, f, order=2): return sosfilt(butter(order, f, 'low', fs=SR, output='sos'), x)
 def hp(x, f, order=2): return sosfilt(butter(order, f, 'high', fs=SR, output='sos'), x)
 
 
-INSERT = 7 * SHOT          # the foretelling (s07b) was cut in here: everything written for later shots moves one shot on
-
-
 def add(t0, sig, pan=0., gain=1., wet=.25, raw=False):
-    if not raw and t0 >= INSERT - 1e-6: t0 += SHOT
     i = int(t0 * SR)
     if i >= NS or len(sig) == 0: return
     if i < 0: sig = sig[-i:]; i = 0
@@ -220,7 +218,7 @@ def score():
 
 def foretelling():
     """S07b, in film time: hushed; a drone, the lyre walking down the Phrygian scale, a chime and a soft drum as each panel is laid."""
-    t0 = INSERT; A = [.45 + 1.05 * k for k in range(4)]
+    t0 = at('s07b'); A = [.45 + 1.05 * k for k in range(4)]
     add(t0, drone(38, SHOT, .45, fade=1.2), wet=.45, raw=True); add(t0, drone(39, SHOT * .8, .12, fade=1.5), pan=.3, wet=.45, raw=True)
     for k, (a, m) in enumerate(zip(A, (69, 67, 63, 62))):
         add(t0 + a, tap(.5), pan=.3, raw=True); add(t0 + a, drum('dum', .3), wet=.3, raw=True)
@@ -229,6 +227,19 @@ def foretelling():
     add(t0 + A[3] + .3, sea(1.4, .08), pan=.4, wet=.3, raw=True)
     add(t0 + 4.55, lyre(50, 3.5, .4) + lyre(57, 3.5, .3), pan=-.2, wet=.5, raw=True)
     add(t0 + 4.4, sizzle(.9, .03), pan=-.6, raw=True)                         # the candle
+
+
+def cards():
+    """Under each intertitle: the card laid down, a low drone, and the lyre slowly (Dorian until the sun, Phrygian after it)."""
+    for n in range(1, 10):
+        sid = 'c%02d' % n; t0 = at(sid); dark = n >= 7
+        add(t0 + .02, tap(.55), pan=.1, wet=.2, raw=True); add(t0, whoosh(.35, 300, 900, .12), wet=.2, raw=True)
+        add(t0, drone(38, SHOT, .32, fade=.8), wet=.5, raw=True)
+        if dark: add(t0, drone(39, SHOT, .1, fade=1.2), pan=.3, wet=.5, raw=True)
+        phrase = ([62, 65, 69, 67] if not dark else [62, 63, 65, 62])
+        for k, m in enumerate(phrase): add(t0 + .5 + k * 1.15, lyre(m, 2.6, .32), pan=-.2, wet=.45, raw=True)
+        add(t0 + .5, lyre(50, 4.5, .28), pan=-.2, wet=.5, raw=True)
+    add(at('c09'), sea(SHOT, .1), wet=.3, raw=True)                            # the sea goes on under the father's cry
 
 
 def effects():
@@ -256,7 +267,7 @@ def effects():
     # sea and air
     add(shot(3), sea(SHOT, .22), wet=.3); add(shot(4), sea(SHOT, .1), wet=.3); add(shot(7, 2.5), sea(SHOT - 2.5, .2), wet=.3)
     for s in range(9, 13): add(shot(s), sea(SHOT, .12), wet=.3)
-    add(shot(14), sea(2 * SHOT + TAIL, .26), wet=.3)
+    add(shot(14), sea(SHOT, .26), wet=.3); add(shot(15), sea(SHOT + TAIL, .26), wet=.3)
     for t0 in (.6, 2.4, 3.9): add(shot(3, t0), gull_cry(.15), pan=.5, wet=.4)
     for t0 in (.8, 3.1): add(shot(9, t0), gull_cry(.12), pan=-.5, wet=.4)
     add(shot(5), sizzle(2 * SHOT, .05), pan=-.5)                                # candle
@@ -287,17 +298,18 @@ def reverb(x, secs=2.6):
 
 
 if __name__ == '__main__':
-    score(); effects(); foretelling()
+    score(); effects(); foretelling(); cards()
     mix = DRY + reverb(WET)
     mix = hp(mix, 30)
     # a gentle compressor (2:1 above -32 dB) that keeps the shape of the piece, loudness to about -18 dB RMS, a soft ceiling
     env = np.sqrt(lp(np.mean(mix ** 2, 0), 6, order=1).clip(1e-12)); th = 10 ** (-32 / 20)
     g = np.where(env > th, (env / th) ** (1 / 2 - 1), 1.); mix = mix * lp(g, 12, order=1)
     # the arc of the piece, in dB per shot: hushed in Crete, building through the flight, loudest as the wing comes apart
-    arc = [-5, -5, -4, -4, -5, -4, -3, -5, -1, 0, 0, 1, 2, 0, -3, -5]
-    centres = [(i + .5) * SHOT for i in range(len(film.SHOTS))]; tx = np.arange(mix.shape[1]) / SR
+    level = dict(s01=-5, s02=-5, s03=-4, s04=-4, s05=-5, s06=-4, s07=-3, s07b=-5, s08=-1, s09=0, s10=0, s11=1, s12=2, s13=0, s14=-3, s15=-5)
+    arc = [level.get(s, -8) for s, _, _ in film.SHOTS]                          # the intertitles sit low
+    centres = [(a + n / 2) / film.FPS for _, a, n in film.SHOTS]; tx = np.arange(mix.shape[1]) / SR
     mix *= 10 ** (np.interp(tx, centres, arc) / 20)
-    mix *= 10 ** (-16 / 20) / np.sqrt(np.mean(mix[:, int(9 * SHOT * SR):int(13 * SHOT * SR)] ** 2))   # the flight sits at -16 dB
+    fl = (int(at('s08') * SR), int((at('s11') + SHOT) * SR)); mix *= 10 ** (-16 / 20) / np.sqrt(np.mean(mix[:, fl[0]:fl[1]] ** 2))   # the flight sits at -16 dB
     mix = np.tanh(mix / .95) * .95
     end = int(LEN * SR); mix = mix[:, :end]; f = int(.4 * SR); mix[:, -f:] *= np.linspace(1, 0, f)
     out = os.path.join(HERE, 'out', 'score.wav'); os.makedirs(os.path.dirname(out), exist_ok=True)
