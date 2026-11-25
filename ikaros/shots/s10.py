@@ -22,4 +22,4 @@ def draw(d):
     winged(cv, (430, 800 - 20 * t, D(-18), .5), 200, t, period=1.2, flap=12, bob=6, beard=True, shadow=(6, 9, 6, .36))
     u = ease(0, 5.3, t)
     winged(cv, (880 + 380 * u, 680 - 330 * u, D(-28 - 14 * u), .78 - .1 * u), 300, t, period=1.1, flap=13, bob=8, singe=.3 * u, shadow=(10, 15, 9, .4))
-    return finish(cv, d)
+    return finish(cv, d, light='late')

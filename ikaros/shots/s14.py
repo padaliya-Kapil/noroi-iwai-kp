@@ -7,7 +7,7 @@ LAND = [(560, 760, 2.0), (1320, 700, 1.6), (820, 900, 2.6), (1500, 860, 3.1), (3
 
 
 def build(cv, h, w):
-    bands(cv, [(None, 160, PAL['sky_hi']), (120, HZ + 30, PAL['sky_lo'])], w, 19)
+    bands(cv, [(None, 160, '#9a8c82'), (120, HZ + 30, '#e0c29c')], w, 19)
     sea(cv, HZ, w, h, seed=47)
 
 
@@ -32,4 +32,4 @@ def draw(d):
         cv.put(mask(lambda c, pts=pts: (poly(c, pts), c.fill())), feather_tex(kind, col, 170 + i), edge='cut', seed=170 + i,
                shadow=(9, 13, 7, .32) if tau < 1.6 else (2, 3, 2, .3), marks=[(mask(lambda c, sp=sp: (c.set_line_width(1.2), poly(c, sp, close=False), c.stroke())), SEPIA, .5)],
                singe=.5, wobble=.8, move=True)
-    return finish(cv, d)
+    return finish(cv, d, light='afternoon')

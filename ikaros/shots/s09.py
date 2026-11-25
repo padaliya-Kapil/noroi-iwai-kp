@@ -7,6 +7,8 @@ HZ = 640
 
 def build(cv, h, w):
     bands(cv, [(None, 260, ST.engraved(PAL['sky_hi'], 11, pitch=4, ang=-2, width=.22, ink=.22, ink_col='#38464c')), (220, 470, PAL['sky_mid']), (430, HZ + 30, PAL['sky_lo'])], w, 16)
+    rays(cv, 1640, 250, n=14, seed=9, L=2400)
+    sun(cv, 1640, 250, 78, seed=7, ring=False, tint=('#f0c080', .15))
     sea(cv, HZ, w, h, seed=45)
 
 
@@ -36,5 +38,5 @@ def draw(d):
     for i, (x0, y0, ph) in enumerate(((330, 300, 0.), (1650, 260, 1.7))):
         gull(cv, x0 + 30 * math.sin(t + ph), y0 + 20 * math.sin(t * 1.7 + ph), .75, t, 930 + i)
     winged(cv, (700, 520, D(-10), .72), 200, t, period=1.3, flap=12, bob=10, beard=True, shadow=(9, 14, 8, .4))
-    winged(cv, (1180, 380 + 80 * math.sin(t * 1.3), D(-14 + 14 * math.cos(t * 1.3)), .72), 300, t, period=1.0, flap=14, bob=8, shadow=(9, 14, 8, .4))
-    return finish(cv, d)
+    winged(cv, (1180, 400 + 80 * math.sin(t * 1.3), D(-14 + 14 * math.cos(t * 1.3)), .6), 300, t, period=1.0, flap=14, bob=8, shadow=(9, 14, 8, .4))
+    return finish(cv, d, light='morning')

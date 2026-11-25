@@ -28,7 +28,22 @@ def cached(name, build, h=H, w=W, scale=1):
     q = p + '.%d.npy' % os.getpid(); np.save(q, cv.im); os.replace(q, p); return cv.im
 
 
-def finish(cv, d, desat=.12):
+# the light of the day, as a grade over the whole page: (multiply r, g, b), lift towards a colour, desaturation
+LIGHT = dict(
+    dawn=((1.0, .94, .95), ('#f0b8a0', .06), .14),      # cool and rosy, the sun just up
+    morning=((1.02, 1.0, .97), ('#f3dcb0', .03), .12),
+    late=((1.05, 1.0, .9), ('#f5d79a', .05), .14),      # late morning: warming
+    noon=((1.08, 1.03, .84), ('#fff0c8', .09), .22),    # white heat: bleached, blue burnt out of it
+    hot=((1.1, 1.02, .8), ('#fff2cc', .12), .24),
+    afternoon=((1.06, .98, .86), ('#f0c890', .05), .16),
+    sunset=((1.06, .9, .88), ('#e8905a', .07), .1),
+)
+
+
+def finish(cv, d, desat=.12, light=None):
+    if light:
+        (mr, mg, mb), (lc, lk), desat = LIGHT[light]
+        cv.im = cv.im * np.array([mr, mg, mb], np.float32) * (1 - lk) + rgb(lc) * lk
     return cv.finish(seed=9, desat=desat, flicker=.006)
 
 
@@ -63,12 +78,14 @@ def crests(cv, t, rows, w=W, seed=47, speed=26, move=True, x1=None):
     cv.put(mask(draw), paper(PAL['foam'], 48), edge='cut', seed=48, shadow=(2, 3, 2, .35), wobble=.5, move=move)
 
 
-def sun(cv, x, y, R, seed=3, ring=True):
+def sun(cv, x, y, R, seed=3, ring=True, tint=None):
     disc = lambda rr, dx=0, dy=0: (lambda c: (c.arc(x + dx, y + dy, rr, 0, 2 * math.pi), c.fill()))
     if ring: cv.put(mask(disc(R * 1.19)), ST.engraved(PAL['parch'], 8, pitch=4, ang=-30, width=.28, ink=.3), edge='torn', seed=81, amp=8, rim=3.5, shadow=(5, 8, 6, .28))
     cv.put(mask(disc(R * 1.07, -3, 2)), paper(PAL['clay'], 9, mottle=.07), edge='cut', seed=82, wobble=2.5, shadow=(4, 7, 5, .3))
     cv.put(mask(disc(R * 1.022, -1, 1)), slip(10), edge='cut', seed=84, wobble=1.5, shadow=(2, 3, 3, .3))
     cv.put(mask(disc(R)), gold(seed=seed, center=(x - R * .28, y - R * .35), radius=R * 1.4), edge='cut', seed=83, wobble=2., shadow=(5, 8, 6, .35))
+    if tint:                                                                    # a glaze over the leaf: rose at dawn, red at sunset
+        cv.put(mask(disc(R * .99)), paper(tint[0], 85, mottle=.05), edge='none', opacity=tint[1], shadow=(0, 0, 0, 0))
 
 
 def rays(cv, x, y, n=12, seed=5, L=2200):

@@ -187,7 +187,7 @@ def score():
     add(shot(7, 2.5), drum('boom', .6), wet=.3); add(shot(7, 4.0), lyre(50, 3, .5) + lyre(57, 3, .4) + lyre(62, 3, .35), pan=-.2, wet=.35)
     # V. Flight: a gathering roll, the leaps, then the flight theme on everything
     for i in range(24): add(shot(8, i * 1.6 / 24), drum('tek', .08 + .25 * i / 24), pan=.2, wet=.2)
-    add(shot(8, 1.6), drum('boom', .9), wet=.3); add(shot(8, 2.2), drum('boom', 1.), wet=.3)
+    add(shot(8, 1.6), drum('boom', .9), wet=.3); add(shot(8, 2.35), drum('boom', 1.), wet=.3)
     themeF = [(15, 0, .5, 74), (15, .5, .5, 76), (15, 1, 1, 77), (15, 2, .5, 76), (15, 2.5, .5, 74), (15, 3, 1, 72),
               (16, 0, 1.5, 74), (16, 1.5, .5, 69), (16, 2, 2, 74),
               (17, 0, .5, 77), (17, .5, .5, 79), (17, 1, 1, 81), (17, 2, .5, 79), (17, 2.5, .5, 77), (17, 3, 1, 76),
@@ -261,7 +261,7 @@ def effects():
     for s, per, t0 in ((8, 1.1, 1.8), (9, 1.0, 0), (9, 1.3, .2), (10, 1.1, 0), (11, 1.5, 0), (12, 2.2, 0)):
         t = t0
         while t < SHOT: add(shot(s, t), whoosh(.45, 250, 1100, .16), pan=.2, wet=.2); t += per
-    add(shot(8, 1.6), whoosh(.9, 150, 1600, .5), wet=.3); add(shot(8, 2.2), whoosh(.9, 150, 1600, .55), pan=.3, wet=.3)
+    add(shot(8, 1.6), whoosh(.9, 150, 1600, .5), wet=.3); add(shot(8, 2.35), whoosh(.9, 150, 1600, .55), pan=.3, wet=.3)
     # wax and the wing coming apart
     add(shot(11), sizzle(2 * SHOT, .14), pan=.3)
     for t0 in (.6, 2.0, 3.3): add(shot(11, t0), tear(.35, .4), pan=.3); add(shot(11, t0), kymbala(96, .25), pan=.4, wet=.6)

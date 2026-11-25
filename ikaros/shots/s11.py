@@ -21,4 +21,4 @@ def draw(d):
         if t >= t0:
             F = winged(None, IK, 300, t0, dry=True); c, a, L = primary_pose(F, i, extra=.28)
             air_feather(cv, 20 + j, c, a, L, t - t0, -110 + 30 * j, 95, -55 + 30 * j, 24, j * 1.3)
-    return finish(cv, d)
+    return finish(cv, d, light='noon')

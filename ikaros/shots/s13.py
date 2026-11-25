@@ -32,4 +32,4 @@ def draw(d):
     y = 470 + max(0., t - 4.2) ** 2 * 1500
     F = figure(cv, (960 + 50 * math.sin(t * 1.3), y, D(-150 + 70 * t), .9), 300, pose='fall', shadow=(12, 18, 12, .45))
     F.lay_spar(cv, (8, 12, 8, .4))
-    return finish(cv, d)
+    return finish(cv, d, light='afternoon')
