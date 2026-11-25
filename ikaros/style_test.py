@@ -128,7 +128,7 @@ def flyer(cv, F, seed, melt, shadow, dim_far=.3, wax_scale=1.):
     lay(wing_feathers(F.lead(), xf, seed + 2, skip=melt.get('skip', ()), loose=melt.get('loose', ())), melt.get('singe', 0))
     F.lay_spar(cv, shadow); F.lay_body(cv, 'near', shadow); F.lay_harness(cv, shadow); F.lay_arm(cv, shadow); F.lay_straps(cv)
     # wax sits just behind the arm, where the quills meet the reed
-    L = F.lead(); g0, g1 = math.atan2(.12, -1.), math.atan2(-.62, -.78); pts = []
+    L = F.lead(); g0, g1 = math.atan2(.12, -1.), math.atan2(-.62, -.78) + 2 * math.pi; pts = []   # back along the wing, wrapped the short way
     for (a, b), t0 in zip(((L[0], L[1]), (L[1], L[2]), (L[2], L[3])), (0., .4, .8)):
         for u in np.linspace(0, 1, 4)[:-1]:
             p = lerp(a, b, u); g = g0 + (g1 - g0) * (t0 + u * .4); pts.append(xform(xf, (p[0] + 30 * math.cos(g), p[1] + 30 * math.sin(g))))

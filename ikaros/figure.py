@@ -52,7 +52,7 @@ def text_print(col, seed):
     """Newsprint: grey bars standing for lines of type, set in a column (no letters, only their colour)."""
     base = paper(col, seed, mottle=.03); ink = rgb(SEPIA)
     def f(h, w, y0, x0):
-        b = base(h, w, y0, x0); r = rng(seed); X = np.arange(w)[None, :] + x0; Y = np.arange(h)[:, None] + y0
+        b = base(h, w, y0, x0); x0 = y0 = 0; X = np.arange(w)[None, :]; Y = np.arange(h)[:, None]
         row = (Y // 9); on = ((Y % 9) >= 3) & ((Y % 9) <= 6)
         wl = (np.sin(row * 12.9898 + seed) * 43758.5453) % 1
         word = ((X + (row * 37) % 23) // 5 % 7 != 0) & (((X - x0) % 230) < 200 * (.55 + .45 * wl))
@@ -62,13 +62,13 @@ def text_print(col, seed):
 
 
 def feather_tex(kind, col, seed):
-    if kind == 'lines': return lines_print(col, SEPIA, seed=seed, pitch=4, ang=60 + seed % 40, width=.26, ink=.42)
+    if kind == 'lines': return lines_print(col, SEPIA, seed=seed, pitch=4, ang=60 + seed % 40, width=.26, ink=.42, local=True)
     if kind == 'text': return text_print(col, seed)
     return paper(col, seed, mottle=.04, fiber=.09)
 
 
 def wing_feathers(lead, xf, seed, rows=((1., 17, 0), (.56, 15, 1), (.3, 12, 2)), a0=(-1., .12), a1=(-.78, -.62), Lmin=95, Lmax=300,
-                  skip=(), loose=(), dim=0.):
+                  skip=(), loose=(), dim=0., flutter=None):
     """Feathers laid along a leading edge (shoulder, elbow, wrist, tip).  Returns [(mask, tex, quill mask, seed, singe)] bottom first."""
     seg = [math.dist(lead[i], lead[i + 1]) for i in range(len(lead) - 1)]; tot = sum(seg)
     def at(t):
@@ -86,6 +86,8 @@ def wing_feathers(lead, xf, seed, rows=((1., 17, 0), (.56, 15, 1), (.3, 12, 2)),
             if row == 0 and i in skip: continue
             L = (Lmin + (Lmax - Lmin) * t ** .9) * (1 - .38 * smooth(.86, 1., t)) * k
             ang = g0 + (g1 - g0) * t ** 1.15 + r.normal(0, .035)
+            if flutter:                                                        # (time s, radians): tips and loose feathers shake most
+                ft, fa = flutter; ang += fa * (.3 + t) * (3.5 if row == 0 and i in loose else 1.) * math.sin(2 * math.pi * (ft * 2.3 + i * .37 + row * .21))
             b = at(t); b = (b[0] - math.cos(ang) * 4 * (row == 0), b[1] - math.sin(ang) * 4 * (row == 0))
             if row == 0 and i in loose: ang += .28; b = (b[0] + math.cos(ang) * 14 - 6, b[1] + math.sin(ang) * 14 + 10)
             wd = min(max(.2 * L, 15), 40) * (1.15 if row else 1.)
@@ -100,16 +102,16 @@ def wing_feathers(lead, xf, seed, rows=((1., 17, 0), (.56, 15, 1), (.3, 12, 2)),
     return out
 
 
-def lay_feathers(cv, feathers, singe_tip=0., shadow=(5, 7, 4., .3)):
+def lay_feathers(cv, feathers, singe_tip=0., shadow=(5, 7, 4., .3), move=False):
     for m, tex, q, s, t in feathers:
-        cv.put(m, tex, edge='cut', seed=s, shadow=shadow, marks=[(q, SEPIA, .5)], singe=singe_tip * smooth(.55, 1., t), wobble=.8)
+        cv.put(m, tex, edge='cut', seed=s, shadow=shadow, marks=[(q, SEPIA, .5)], singe=singe_tip * smooth(.55, 1., t), wobble=.8, move=move)
 
 
 # ----------------------------------------------------------------------------------------------- the flyer
 class Flyer:
     def __init__(self, xf, seed=0, beard=False, arm=((132, -18), (150, -104), (226, -150)), arm_far=((124, -22), (132, -108), (200, -162)),
                  leg=((4, 8), (-96, 20), (-186, 4), (-226, 13)), leg_far=((4, 2), (-84, 26), (-140, 96), (-172, 113))):
-        self.xf, self.seed, self.beard = xf, seed, beard
+        self.xf, self.seed, self.beard, self.move = xf, seed, beard, False
         self.arm, self.arm_far, self.leg, self.leg_far = arm, arm_far, leg, leg_far
 
     def M(self, draw):
@@ -177,18 +179,18 @@ class Flyer:
         return [xform(self.xf, p) for p in (self.arm[0], self.arm[1], self.leg[0], self.leg[1])], 6.5 * k / 1.15
 
     def lay_body(self, cv, part, shadow):
-        s = self.seed
+        s = self.seed; mv = self.move
         if part == 'far':
             for i, (m, inc) in enumerate(self.leg_parts(True) + self.arm_parts(True)):
-                cv.put(m, slip(s + i, '#2a221d'), edge='cut', seed=s + 40 + i, shadow=shadow, marks=[(inc, CLAY, .9)] if inc is not None else [])
+                cv.put(m, slip(s + i, '#2a221d'), edge='cut', seed=s + 40 + i, shadow=shadow, marks=[(inc, CLAY, .9)] if inc is not None else [], move=self.move)
         else:
             parts = self.leg_parts(False) + [self.torso(), self.head()]
             for i, (m, inc) in enumerate(parts):
-                cv.put(m, slip(s + 10 + i), edge='cut', seed=s + 60 + i, shadow=shadow, marks=[(inc, CLAY, .92)] if inc is not None else [])
+                cv.put(m, slip(s + 10 + i), edge='cut', seed=s + 60 + i, shadow=shadow, marks=[(inc, CLAY, .92)] if inc is not None else [], move=self.move)
 
     def lay_arm(self, cv, shadow):
         for i, (m, inc) in enumerate(self.arm_parts(False)):
-            cv.put(m, slip(self.seed + 30 + i), edge='cut', seed=self.seed + 80 + i, shadow=shadow, marks=[(inc, CLAY, .92)] if inc is not None else [])
+            cv.put(m, slip(self.seed + 30 + i), edge='cut', seed=self.seed + 80 + i, shadow=shadow, marks=[(inc, CLAY, .92)] if inc is not None else [], move=self.move)
 
     def lay_spar(self, cv, shadow, far=False):
         """A split reed along the leading edge, past the hand to the wing tip: the frame the feathers are bound to."""
@@ -196,12 +198,12 @@ class Flyer:
         pts = [(L[0][0] - 10, L[0][1] - 14), (L[1][0] - 12, L[1][1] - 16), (L[2][0] - 2, L[2][1] - 19), (tip[0], tip[1] - 14)]
         m = self.M(lambda c: (c.set_line_width(11), poly(c, pts, close=False), c.stroke()))
         cv.put(m, lines_print('#b39a6c' if not far else '#8a7656', '#3a2a1c', seed=self.seed + 5, pitch=3, ang=math.degrees(self.xf[2]) - 75, width=.3, ink=.35),
-               edge='cut', seed=self.seed + 5, shadow=shadow, wobble=.5)
+               edge='cut', seed=self.seed + 5, shadow=shadow, wobble=.5, move=self.move)
 
     def lay_harness(self, cv, shadow):
         s = self.arm[0]
         m = self.M(lambda c: (c.set_line_width(10), c.move_to(s[0] + 6, s[1] - 6), c.curve_to(128, 10, 112, 30, 100, 40), c.stroke()))
-        cv.put(m, paper('#7a5636', self.seed + 6, mottle=.08), edge='cut', seed=self.seed + 6, shadow=(2, 3, 2, .4), wobble=.4,
+        cv.put(m, paper('#7a5636', self.seed + 6, mottle=.08), edge='cut', seed=self.seed + 6, shadow=(2, 3, 2, .4), wobble=.4, move=self.move,
                marks=[(self.M(lambda c: (c.set_line_width(1.), c.set_dash([3, 3]), c.move_to(s[0] + 6, s[1] - 6), c.curve_to(128, 10, 112, 30, 100, 40), c.stroke())), '#d8c49a', .7)])
 
     def lay_straps(self, cv, far=False):
@@ -210,22 +212,30 @@ class Flyer:
             p = lerp(a, b, t); dx, dy = b[0] - a[0], b[1] - a[1]; l = math.hypot(dx, dy); nx, ny = -dy / l, dx / l; h = wd / 2 + 5
             c.set_line_width(7); c.move_to(p[0] + nx * h, p[1] + ny * h); c.line_to(p[0] - nx * h, p[1] - ny * h); c.stroke()
         m = self.M(lambda c: (band(c, s, e, .55, 26), band(c, e, w, .5, 17)))
-        cv.put(m, paper('#7a5636' if not far else '#5e4630', self.seed + 7, mottle=.08), edge='cut', seed=self.seed + 7, shadow=(2, 3, 2, .45), wobble=.4)
+        cv.put(m, paper('#7a5636' if not far else '#5e4630', self.seed + 7, mottle=.08), edge='cut', seed=self.seed + 7, shadow=(2, 3, 2, .45), wobble=.4, move=self.move)
 
     def lay_brads(self, cv):
         pts, r = self.joints()
         for x, y in pts:
-            cv.put(mask(lambda c, x=x, y=y: (c.arc(x, y, r, 0, 2 * math.pi), c.fill())), brass(x, y, r), edge='cut', seed=int(x), shadow=(1.5, 2.5, 1.5, .45), wobble=.2)
+            cv.put(mask(lambda c, x=x, y=y: (c.arc(x, y, r, 0, 2 * math.pi), c.fill())), brass(x, y, r), edge='cut', seed=int(x), shadow=(1.5, 2.5, 1.5, .45), wobble=.2, move=self.move)
 
 
 # ----------------------------------------------------------------------------------------------- wax
-def wax(cv, pts, seed, drips=True, scale=1.):
-    """Beeswax pressed over the feather roots: translucent amber blobs, some running in drips (gravity is +y on the page)."""
+def wax(cv, pts, seed, drips=True, scale=1., t=None, move=False):
+    """Beeswax pressed over the feather roots: translucent amber blobs, some running in drips (gravity is +y on the page).
+    With t (seconds) the drips lengthen, and every so often a drop lets go and falls."""
     r = rng(seed); blobs = []; runs = []
     for p in pts:
         rr = r.uniform(5, 10) * scale; blobs.append((p[0] + r.normal(0, 3), p[1] + r.normal(0, 3), rr))
         if drips and r.random() < .55: runs.append((p[0] + r.normal(0, 4), p[1] + rr * .4, r.uniform(18, 75) * scale, r.uniform(4.5, 7.5) * scale))
+    drops = []
+    if t is not None:
+        runs = [(x, y, l * (.55 + .5 * smooth(0, 1, ((t + i * .53) % 2.2) / 2.2)), w) for i, (x, y, l, w) in enumerate(runs)]
+        for i, (x, y, l, w) in enumerate(runs[:6]):
+            ph = (t + i * .53) % 2.2; fall = ph - 1.5                         # each drip lets a drop go near the end of its cycle
+            if fall > 0: drops.append((x + w * .15, y + l + 6 + .5 * 1400 * fall * fall, w * .75))
     def draw(c):
+        for x, y, rr in drops: c.save(); c.translate(x, y); c.scale(.8, 1.2); c.arc(0, 0, rr, 0, 2 * math.pi); c.restore(); c.fill()
         for x, y, rr in blobs:
             c.save(); c.translate(x, y); c.scale(1, .8); c.arc(0, 0, rr, 0, 2 * math.pi); c.restore(); c.fill()
         for x, y, l, w in runs:
@@ -233,4 +243,4 @@ def wax(cv, pts, seed, drips=True, scale=1.):
     hl = mask(lambda c: [(c.save(), c.translate(x - rr * .35, y - rr * .35), c.scale(1, .6), c.arc(0, 0, rr * .3, 0, 2 * math.pi), c.restore(), c.fill()) for x, y, rr in blobs]
               + [(c.arc(x - w * .2, y + l - w * .2, w * .22, 0, 2 * math.pi), c.fill()) for x, y, l, w in runs])
     cv.put(mask(draw), paper('#b8873e', seed, mottle=.12, fiber=0., grain=.02, cell=18), edge='cut', seed=seed, opacity=.8,
-           shadow=(2, 3, 2., .35), marks=[(hl, '#f3e6c4', .7)], wobble=.6)
+           shadow=(2, 3, 2., .35), marks=[(hl, '#f3e6c4', .7)], wobble=.6, move=move)

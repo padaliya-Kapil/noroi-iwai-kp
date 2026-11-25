@@ -85,11 +85,12 @@ def fibers(h, w, r, density=1 / 650.):
 def paper(col, seed=0, mottle=.045, fiber=.07, grain=.03, cell=80):
     col = rgb(col) if isinstance(col, str) else np.asarray(col, f32)
     def f(h, w, y0, x0):
+        h0, w0 = h, w; h, w = -(-h // 64) * 64, -(-w // 64) * 64               # the same sheet as long as the piece keeps its size class
         r = rng(seed * 7919 + 17)
         t = col[None, None, :] * (1 + mottle * noise(h, w, cell, seed + 1)[..., None])
         t = t * (1 + fiber * fibers(h, w, r)[..., None])
         g = cv2.GaussianBlur(r.standard_normal((h, w)).astype(f32), (0, 0), .7)
-        return t * (1 + grain * (g / (g.std() + 1e-6))[..., None])
+        return (t * (1 + grain * (g / (g.std() + 1e-6))[..., None]))[:h0, :w0]
     return f
 
 
@@ -106,11 +107,11 @@ def halftone(paper_col, ink_col, tone, cell=8., ang=15., seed=0, ink=.9):
     return f
 
 
-def lines_print(paper_col, ink_col, seed=0, pitch=9, ang=0., width=.38, ink=.55, cell=120):
-    """Engraved hatching: parallel lines whose weight follows a slow noise."""
+def lines_print(paper_col, ink_col, seed=0, pitch=9, ang=0., width=.38, ink=.55, cell=120, local=False):
+    """Engraved hatching: parallel lines whose weight follows a slow noise.  local: lines belong to the piece, not the page."""
     base = paper(paper_col, seed, mottle=.03); ink_col = rgb(ink_col)
     def f(h, w, y0, x0):
-        b = base(h, w, y0, x0); X, Y = grid(h, w, y0, x0); a = math.radians(ang)
+        b = base(h, w, y0, x0); X, Y = grid(h, w) if local else grid(h, w, y0, x0); a = math.radians(ang)
         v = (-X * math.sin(a) + Y * math.cos(a)) / pitch
         wt = width * (1 + .45 * noise(h, w, cell, seed + 3, 2))
         k = clip((wt * pitch / 2 - np.abs((v % 1) - .5) * pitch) + .5)[..., None] * ink
@@ -162,12 +163,20 @@ def brass(cx, cy, r):
 
 # ----------------------------------------------------------------------------------------------- the page
 class Canvas:
-    def __init__(self, base):
-        self.im = base.astype(f32)
+    def __init__(self, base, jitter=0., drawing=0):
+        """jitter: how far (px) a hand-placed piece lands off its mark on each drawing, for pieces put with move=True."""
+        self.im = base.astype(f32); self.jit, self.drawing = jitter, drawing
 
     def put(self, m, tex, edge='torn', seed=0, amp=6., rim=3.5, rim_col='#f6f0e2', shadow=(4, 6, 4., .32), opacity=1.,
-            marks=(), singe=0., wobble=1.2):
+            marks=(), singe=0., wobble=1.2, move=False):
         """Lay one piece.  edge: 'torn' (ragged, white core showing) | 'cut' (scissors: clean, faintly wavering) | 'none'."""
+        if move and self.jit:
+            j = rng(seed * 31 + self.drawing * 7919).normal(0, self.jit, 3)
+            x, y, w, h = cv2.boundingRect((m > .01).astype(np.uint8))
+            if w:
+                cx, cy = x + w / 2., y + h / 2.; A = cv2.getRotationMatrix2D((cx, cy), j[2] * .4, 1.); A[:, 2] += j[:2]
+                m = cv2.warpAffine(m, A, (W, H))
+                marks = [(cv2.warpAffine(mk, A, (W, H)), c, a) for mk, c, a in marks]
         x, y, w, h = cv2.boundingRect((m > .01).astype(np.uint8))
         if w == 0: return
         dx, dy, sb, ss = shadow
@@ -207,11 +216,12 @@ class Canvas:
         ba = (body * opacity)[..., None]
         self.im[y0:y1, x0:x1] = im * (1 - ba) + t * ba
 
-    def finish(self, seed=0, vig=.13, grain=.018, warm=(1.02, 1., .965), desat=0.):
+    def finish(self, seed=0, vig=.13, grain=.018, warm=(1.02, 1., .965), desat=0., flicker=0.):
         X, Y = grid(H, W)
         r = np.hypot((X - W * .55) / (W * .62), (Y - H * .45) / (H * .7))
         im = self.im * (1 - vig * smooth(.35, 1.25, r))[..., None] * np.array(warm, f32)
+        if flicker: im = im * (1 + flicker * rng(self.drawing + 555).normal())
         if desat: im = im * (1 - desat) + (im @ np.array([.3, .59, .11], f32))[..., None] * desat
-        g = cv2.GaussianBlur(rng(seed).standard_normal((H, W)).astype(f32), (0, 0), .6)
+        g = cv2.GaussianBlur(rng(seed + self.drawing * 101).standard_normal((H, W)).astype(f32), (0, 0), .6)
         im = im * (1 + grain * g / g.std())[..., None]
         return (clip(im) ** (1 / 1.0) * 255 + .5).astype(np.uint8)
