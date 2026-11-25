@@ -18,13 +18,14 @@ def build(cv, h, w):
 def page(): return cached('s08', build, PH, W)
 
 
-def flyer_at(cv, t, t0, x0, seed, beard, rise=200):
+def flyer_at(cv, t, t0, x0, seed, beard, rise=200, vx=150, q=20):
+    """Paths chosen so the two stay at least ~530 px apart and both in frame while the camera rises."""
     tau = t - t0; u = ease(0, .7, tau)
     if tau < 0: crouch = 0.
     else: crouch = max(0., 1 - abs(tau + .25) / .25) if tau < 0 else 0.
     pose = pose_mix('stand', 'fly', u)
     a0 = lerp((-1., -.35), (-1., .12), u); a1 = lerp((-.9, -.75), (-.78, -.62), u)
-    T = max(tau, 0.); x = x0 + 150 * T + 10 * T * T; y = ROOF - 244 * .9 - rise * T - 40 * T * T
+    T = max(tau, 0.); x = x0 + vx * T; y = ROOF - 244 * .9 - rise * T - q * T * T
     ang = D(-90 + 55 * u)
     winged(cv, (x, y, ang, .9), seed, t, period=1.1, flap=14 * u, bob=6 * u, pose=pose, a0=a0, a1=a1, kick_amt=u, flutter=.04, beard=beard, shadow=(9, 14, 8, .4))
 
@@ -33,6 +34,6 @@ def draw(d):
     t = d / FPS; cy = (ROOF - 860) * (1 - ease(1.8, 5.2, t))
     cv = Canvas(view(page(), 0, cy), jitter=.45, drawing=d)
     with camera(0, cy):
-        flyer_at(cv, t, 2.2, 1120, 300, False, rise=150)
-        flyer_at(cv, t, 1.6, 700, 200, True, rise=250)
+        flyer_at(cv, t, 2.2, 1160, 300, False, rise=140, vx=150)
+        flyer_at(cv, t, 1.6, 620, 200, True, rise=235, vx=40)
     return finish(cv, d)
