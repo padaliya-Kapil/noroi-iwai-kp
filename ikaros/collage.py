@@ -120,12 +120,12 @@ def lines_print(paper_col, ink_col, seed=0, pitch=9, ang=0., width=.38, ink=.55,
 
 def gold(seed=0, sheet=128, center=None, radius=None):
     """Gold leaf: square leaves laid in staggered rows, overlapping seams, crinkled metal, cracks down to the red bole."""
-    dark, mid, hi, bole = rgb('#8c6420'), rgb('#cf9f3e'), rgb('#fbeaa6'), rgb('#8f3a20')
+    dark, mid, hi, bole = rgb('#7a5a26'), rgb('#bb9447'), rgb('#ead28e'), rgb('#7f3a22')
     def f(h, w, y0, x0):
         X, Y = grid(h, w, y0, x0)
-        n = cv2.GaussianBlur(noise(h, w, 30, seed, 4), (0, 0), 1.5)
+        n = cv2.GaussianBlur(noise(h, w, 60, seed, 4), (0, 0), 2.)
         gx = cv2.Sobel(n, cv2.CV_32F, 1, 0, ksize=3); gy = cv2.Sobel(n, cv2.CV_32F, 0, 1, ksize=3)
-        s = .62 + .3 * np.tanh(-(gx * .62 + gy * .78) * 1.6)
+        s = .6 + .17 * np.tanh(-(gx * .62 + gy * .78) * 2.2)
         iy = np.floor(Y / sheet); off = (iy % 2) * sheet * .43 + (iy % 3) * 11; ix = np.floor((X + off) / sheet)
         hsh = ((ix * 73856093.).astype(np.int64) ^ (iy * 19349663.).astype(np.int64)) % 1009 / 1009.
         fx = (X + off) / sheet - ix; fy = Y / sheet - iy
@@ -201,15 +201,17 @@ class Canvas:
             t = t * (1 - k) + c * k
         im = self.im[y0:y1, x0:x1]
         if edge == 'torn' and rim > 0:
-            ra = (clip(outer - body) * clip(.85 + .15 * noise(hh, ww, 2, seed + 13, 1)) * opacity)[..., None]
-            im = im * (1 - ra) + rgb(rim_col) * ra
+            ra = (cv2.GaussianBlur(clip(outer - body), (0, 0), .6) * clip(.9 + .1 * noise(hh, ww, 3, seed + 13, 1)) * opacity)[..., None]
+            core = rgb(rim_col) * .7 + cv2.blur(t, (9, 9)) * .3                  # a torn sheet shows its pale core, tinted by its own colour
+            im = im * (1 - ra) + core * ra
         ba = (body * opacity)[..., None]
         self.im[y0:y1, x0:x1] = im * (1 - ba) + t * ba
 
-    def finish(self, seed=0, vig=.13, grain=.018, warm=(1.02, 1., .965)):
+    def finish(self, seed=0, vig=.13, grain=.018, warm=(1.02, 1., .965), desat=0.):
         X, Y = grid(H, W)
         r = np.hypot((X - W * .55) / (W * .62), (Y - H * .45) / (H * .7))
         im = self.im * (1 - vig * smooth(.35, 1.25, r))[..., None] * np.array(warm, f32)
+        if desat: im = im * (1 - desat) + (im @ np.array([.3, .59, .11], f32))[..., None] * desat
         g = cv2.GaussianBlur(rng(seed).standard_normal((H, W)).astype(f32), (0, 0), .6)
         im = im * (1 + grain * g / g.std())[..., None]
         return (clip(im) ** (1 / 1.0) * 255 + .5).astype(np.uint8)

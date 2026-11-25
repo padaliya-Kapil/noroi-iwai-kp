@@ -4,6 +4,8 @@ A collage film of the Icarus myth, drawn entirely in code: no image files, no fo
 
 `style_test.jpg` is the first frame of the look: Ikaros at the sun, the wax running, Daidalos lower and level.
 
+Palette: parchment and bone papers, faded stone blue, fired clay, black slip, sepia engraving, an indigo sea, and gold leaf for the sun alone. Wings are bound to a reed spar along each arm with leather straps and a chest harness; the feather roots are set in wax.
+
 | File | What it does |
 |---|---|
 | `collage.py` | The paper kit: torn and scissor-cut edges, paper with fibres, halftone and engraved prints, gold leaf, black-figure paper, brass fasteners, shadows of pieces lifted off the page |
