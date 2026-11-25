@@ -178,7 +178,7 @@ def lay_feathers(cv, feathers, singe_tip=0., shadow=(5, 7, 4., .3), move=False):
 
 # ----------------------------------------------------------------------------------------------- the flyer
 class Flyer:
-    def __init__(self, xf, seed=0, beard=False, arm=None, arm_far=None, leg=None, leg_far=None, pose='fly', turn=None, dress=None, crown=False):
+    def __init__(self, xf, seed=0, beard=False, arm=None, arm_far=None, leg=None, leg_far=None, pose='fly', turn=None, dress=None, crown=False, bull=False):
         """pose names a POSE; arm/leg arguments override it.  turn: how far the head turns from looking along the body (rad).
         dress: None | 'chiton' (short tunic) | 'robe' (to the ankles)."""
         P = POSE[pose]
@@ -186,7 +186,7 @@ class Flyer:
         self.arm, self.arm_far = arm or P['arm'], arm_far or P['arm_far']
         self.leg, self.leg_far = leg or P['leg'], leg_far or P['leg_far']
         self.turn = P.get('turn', 0.) if turn is None else turn
-        self.dress, self.crown = dress, crown
+        self.dress, self.crown, self.bull = dress, crown, bull
 
     def M(self, draw):
         return mask(draw, self.xf)
@@ -248,7 +248,27 @@ class Flyer:
     def head_frame(self, c):
         u = self.turn / (math.pi / 2); c.translate(190 + 8 * u, -14 + 12 * u); c.rotate(self.turn); c.translate(-190, 14)
 
+    def bull_head(self):
+        """The Minotaur's head: a heavy skull, a long muzzle forward, two horns sweeping up and forward."""
+        big = lambda c: (c.translate(178, -14), c.scale(1.7, 1.7), c.translate(-178, 14))      # a beast's head, too big for the body
+        def h(c):
+            self.head_frame(c); big(c)
+            c.arc(184, -14, 28, 0, 2 * math.pi); c.fill()
+            c.save(); c.translate(214, -2); c.rotate(.35); c.scale(1, .62); c.arc(0, 0, 30, 0, 2 * math.pi); c.restore(); c.fill()
+            for dx, dy, k in ((0, 0, 1.), (-12, 4, .8)):                        # near horn, far horn
+                c.move_to(172 + dx, -34 + dy); c.curve_to(160 + dx, -70 * k + dy, 196 + dx, -92 * k + dy, 222 + dx, -78 * k + dy)
+                c.curve_to(200 + dx, -78 * k + dy, 182 + dx, -62 * k + dy, 186 + dx, -36 + dy); c.close_path(); c.fill()
+            poly(c, [(166, -30), (148, -44), (160, -22)]); c.fill()              # ear
+        def inc(c):
+            self.head_frame(c); big(c); c.set_line_width(1.2)
+            c.arc(198, -20, 4, 0, 2 * math.pi); c.stroke(); c.arc(198, -20, 1.6, 0, 2 * math.pi); c.fill()
+            c.arc(232, 4, 3, 0, 2 * math.pi); c.stroke()
+            c.move_to(206, 12); c.curve_to(214, 18, 226, 18, 236, 12); c.stroke()
+            for k in range(3): c.move_to(176 + k * 6, -36 - k * 12); c.line_to(186 + k * 6, -40 - k * 12); c.stroke()
+        return self.M(h), self.M(inc)
+
     def head(self):
+        if self.bull: return self.bull_head()
         def h(c):
             self.head_frame(c)
             c.arc(190, -14, 27, 0, 2 * math.pi); c.fill()

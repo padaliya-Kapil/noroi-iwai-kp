@@ -238,8 +238,11 @@ def effects():
     for j in range(6): add(shot(1, 1.1 + .3 * j), tap(.45), pan=-.3 + j * .12)
     s02 = importlib.import_module('shots.s02'); prev = 0
     for d in range(64):
-        k = int(len(s02.WALLS) * s02.ease(.15, 4.4, d / 12))
+        k = int(len(s02.WALLS) * s02.ease(*s02.BUILD, d / 12))
         if k > prev: add(shot(2, d / 12), tap(.35), pan=.2 + .1 * math.sin(d)); prev = k
+    add(shot(2, s02.DROP), drum('boom', .8), wet=.35); add(shot(2, s02.DROP + .05), whoosh(.5, 120, 400, .25), wet=.3)   # the Minotaur lands
+    add(shot(2, s02.DROP + .1), drone(36, 2.6, .5, fade=.4), wet=.4)
+    add(shot(2, s02.POINT_T + .2), drum('dum', .6), wet=.3); add(shot(2, s02.BOW), lyre(50, 3, .45) + lyre(53, 3, .35), pan=-.2, wet=.45)   # the king's judgement
     s05 = importlib.import_module('shots.s05'); prev = 0
     for d in range(64):
         k = int(len(s05.FEATH) * s05.ease(.25, 4.7, d / 12)) + (1 if d / 12 > .25 else 0)

@@ -11,7 +11,7 @@ torn and scissor-cut papers (parchment, bone, stone blue, fired clay, sepia engr
 | Shot | |
 |---|---|
 | s01 | Title: the sun set in, the label laid, the letters ΙΚΑΡΟΣ dropped one by one |
-| s02 | King Minos watches the Labyrinth laid wall by wall; Daidalos sets the walls |
+| s02 | Daidalos builds the Labyrinth for King Minos; the bull-headed Minotaur is put inside; the king turns on his builder and his son |
 | s03 | The tower on its cliff; the camera climbs to the window where father and son are held |
 | s04 | A gull's feather drifts in; Ikaros catches it; Daidalos has the idea |
 | s05 | The workbench by candlelight: feathers sorted into rows, smallest to largest |
