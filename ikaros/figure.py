@@ -26,6 +26,54 @@ def lerp(a, b, t):
     return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
 
 
+class Segment:
+    """A limb part drawn as a modelled outline rather than a tube.  `back` and `front` are half-width profiles [(s, px), ...]
+    along a->b (s may run past 0 and 1).  The back is the +normal side: hamstring, calf, sole; the front is shin and instep."""
+    def __init__(self, a, b, back, front, n=40):
+        self.a, self.b = a, b; dx, dy = b[0] - a[0], b[1] - a[1]; self.L = math.hypot(dx, dy) or 1.
+        self.d = (dx / self.L, dy / self.L); self.n = (-self.d[1], self.d[0]); self.back, self.front = back, front
+        s0, s1 = min(back[0][0], front[0][0]), max(back[-1][0], front[-1][0])
+        S = np.linspace(s0, s1, n); wb = np.interp(S, *zip(*back)); wf = np.interp(S, *zip(*front))
+        k = np.array([1, 4, 6, 4, 1.]) / 16                                   # soften the profile corners
+        wb = np.convolve(np.pad(wb, 2, mode='edge'), k, 'valid'); wf = np.convolve(np.pad(wf, 2, mode='edge'), k, 'valid')
+        self.outline = [self.at(s, w) for s, w in zip(S, wb)] + [self.at(s, -w) for s, w in zip(S[::-1], wf[::-1])]
+
+    def at(self, s, off):
+        """Point at fraction s along the bone, `off` px towards the back (negative: towards the front)."""
+        return (self.a[0] + self.d[0] * s * self.L + self.n[0] * off, self.a[1] + self.d[1] * s * self.L + self.n[1] * off)
+
+    def edge(self, s, side, inset):
+        """Point `inset` px inside the outline at s; side +1 back, -1 front."""
+        w = np.interp(s, *zip(*(self.back if side > 0 else self.front)))
+        return self.at(s, side * (w - inset))
+
+    def fill(self, c, caps=(True, True)):
+        """The outline, with the rounded ends a puppet joint is cut with."""
+        poly(c, self.outline); c.fill()
+        for s, on in zip((0., 1.), caps):
+            if on:
+                wb, wf = np.interp(s, *zip(*self.back)), np.interp(s, *zip(*self.front))
+                c.arc(*self.at(s, (wb - wf) / 2), (wb + wf) / 2, 0, 2 * math.pi); c.fill()
+
+
+def curve(c, pts):
+    """A smooth incised stroke through pts (Catmull-Rom)."""
+    c.move_to(*pts[0])
+    for i in range(len(pts) - 1):
+        p0, p1, p2, p3 = pts[max(i - 1, 0)], pts[i], pts[i + 1], pts[min(i + 2, len(pts) - 1)]
+        c.curve_to(p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6, p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6, *p2)
+    c.stroke()
+
+
+# half-width profiles, in px of the local frame
+THIGH_BACK = [(0, 26), (.22, 25), (.5, 20), (.8, 14), (1., 12.5)]
+THIGH_FRONT = [(0, 28), (.28, 35), (.5, 30), (.78, 18), (.92, 14), (1., 13.5)]
+SHIN_BACK = [(0, 12), (.1, 18), (.24, 23), (.4, 20), (.62, 11), (.86, 7), (1., 6.5)]
+SHIN_FRONT = [(0, 14), (.08, 15.5), (.18, 11.5), (.5, 9), (.86, 6.5), (1., 6.5)]
+FOOT_BACK = [(0, 11), (.1, 12.5), (.3, 8), (.62, 7), (.86, 5.5), (1., 2)]      # sole, round heel at s=0
+FOOT_FRONT = [(0, 7), (.25, 8.5), (.6, 7), (.86, 5.5), (1., 2)]               # instep
+
+
 # ----------------------------------------------------------------------------------------------- feathers
 def feather_pts(base, ang, L, wd, curve=.06, notches=(), quill=.07):
     """Outline of one feather as cut from paper: a short bare quill, a narrow leading vane, a wide trailing vane."""
@@ -110,7 +158,7 @@ def lay_feathers(cv, feathers, singe_tip=0., shadow=(5, 7, 4., .3), move=False):
 # ----------------------------------------------------------------------------------------------- the flyer
 class Flyer:
     def __init__(self, xf, seed=0, beard=False, arm=((132, -18), (150, -104), (226, -150)), arm_far=((124, -22), (132, -108), (200, -162)),
-                 leg=((4, 8), (-96, 20), (-186, 4), (-226, 13)), leg_far=((4, 2), (-84, 26), (-140, 96), (-172, 113))):
+                 leg=((2, 10), (-118, 24), (-232, 20), (-288, 34)), leg_far=((-4, 4), (-110, 34), (-176, -46), (-218, -82))):
         self.xf, self.seed, self.beard, self.move = xf, seed, beard, False
         self.arm, self.arm_far, self.leg, self.leg_far = arm, arm_far, leg, leg_far
 
@@ -134,14 +182,30 @@ class Flyer:
         return [(up, None), (fo, self.M(lambda c: (c.set_line_width(1.6), c.arc(*lerp(e, w, .25), 5, 0, 3.2), c.stroke())))]
 
     def leg_parts(self, far):
+        """Foot, shin and thigh as three cut pieces (bottom first), each with its incisions in the Attic manner:
+        the groin and the vastus on the thigh, the kneecap's double arc, the split of the calf, the ankle bone, the toes."""
         h, k, a, t = self.leg_far if far else self.leg
-        def thigh(c):
-            limb_path(c, h, k, 48, 24); m = lerp(h, k, .35); c.save(); c.translate(*m); c.rotate(math.atan2(k[1] - h[1], k[0] - h[0])); c.scale(1, .52); c.arc(0, 0, 42, 0, 2 * math.pi); c.restore(); c.fill()
-        def shin(c):
-            limb_path(c, k, a, 24, 12); m = lerp(k, a, .3); c.save(); c.translate(*m); c.rotate(math.atan2(a[1] - k[1], a[0] - k[0])); c.scale(1, .5); c.arc(0, 0, 32, 0, 2 * math.pi); c.restore(); c.fill()
-            limb_path(c, a, t, 13, 6)
-        inc = lambda c: (c.set_line_width(1.5), c.arc(*k, 7, 1., 2.6), c.stroke(), c.arc(*lerp(h, k, .55), 13, 3.6, 4.6), c.stroke())
-        return [(self.M(thigh), None), (self.M(shin), self.M(inc))]
+        th = Segment(h, k, THIGH_BACK, THIGH_FRONT); sh = Segment(k, a, SHIN_BACK, SHIN_FRONT); ft = Segment(a, t, FOOT_BACK, FOOT_FRONT)
+        def thigh_inc(c):
+            c.set_line_width(1.5)
+            curve(c, [th.edge(.02, -1, 3), th.edge(.12, -1, 12), th.edge(.2, 1, 14)])                       # groin
+            curve(c, [th.edge(.5, -1, 5), th.edge(.68, -1, 9), th.edge(.86, -1, 5)])                        # vastus over the knee
+            curve(c, [th.edge(.3, 1, 6), th.edge(.55, 1, 7)])                                               # hamstring
+        def shin_inc(c):
+            c.set_line_width(1.5)
+            kp = sh.edge(.02, -1, 6)
+            for r in (5.5, 9.):
+                c.new_sub_path(); c.arc(kp[0], kp[1], r, math.atan2(-sh.d[1], -sh.d[0]) + .9, math.atan2(-sh.d[1], -sh.d[0]) + 2.6); c.stroke()   # kneecap
+            curve(c, [sh.edge(.12, 1, 4), sh.edge(.28, 1, 8), sh.edge(.5, 1, 5)])                          # calf
+            curve(c, [sh.edge(.22, -1, 3), sh.edge(.6, -1, 3.5)])                                           # shin bone
+            m = sh.at(.95, 0); c.new_sub_path(); c.arc(m[0], m[1], 3.2, 0, 2 * math.pi); c.stroke()          # ankle bone
+        def foot_inc(c):
+            c.set_line_width(1.3)
+            for s in (.8, .88): curve(c, [ft.edge(s, -1, .5), ft.edge(s + .04, 1, 1.)])
+            curve(c, [ft.edge(.02, 1, 3), ft.edge(.25, 1, 4)])                                              # arch of the sole
+        return [(self.M(lambda c: ft.fill(c, caps=(True, False))), self.M(foot_inc)),
+                (self.M(sh.fill), self.M(shin_inc)),
+                (self.M(th.fill), self.M(thigh_inc))]
 
     def torso(self):
         def body(c):
@@ -176,7 +240,7 @@ class Flyer:
 
     def joints(self):
         k = self.xf[3]
-        return [xform(self.xf, p) for p in (self.arm[0], self.arm[1], self.leg[0], self.leg[1])], 6.5 * k / 1.15
+        return [xform(self.xf, p) for p in (self.arm[0], self.arm[1], self.leg[0], self.leg[1], self.leg[2])], 6.5 * k / 1.15
 
     def lay_body(self, cv, part, shadow):
         s = self.seed; mv = self.move

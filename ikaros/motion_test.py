@@ -36,6 +36,13 @@ def rot(p, c, a):
     ca, sa = math.cos(a), math.sin(a); return (c[0] + (p[0] - c[0]) * ca - (p[1] - c[1]) * sa, c[1] + (p[0] - c[0]) * sa + (p[1] - c[1]) * ca)
 
 
+def kick(leg, hip, knee, ankle):
+    """Swing a leg (hip, knee, ankle, toe) at the hip, bend it at the knee and point the foot at the ankle (radians)."""
+    h, k, a, t = leg; k = rot(k, h, hip); a = rot(a, h, hip); t = rot(t, h, hip)
+    a = rot(a, k, knee); t = rot(t, k, knee); t = rot(t, a, ankle)
+    return (h, k, a, t)
+
+
 def beat(t, period, phase=0.):
     return math.sin(2 * math.pi * t / period + phase)
 
@@ -47,7 +54,9 @@ def flyer(cv, xf0, seed, t, period, flap, bob, beard=False, melt=None, shadow=(1
     F0 = Flyer(xf); phi = D(flap) * b
     arm = (F0.arm[0], rot(F0.arm[1], F0.arm[0], phi), rot(F0.arm[2], F0.arm[0], phi * 1.25))
     arm_far = (F0.arm_far[0], rot(F0.arm_far[1], F0.arm_far[0], phi * .9), rot(F0.arm_far[2], F0.arm_far[0], phi * 1.15))
-    F = Flyer(xf, seed=seed, beard=beard, arm=arm, arm_far=arm_far); F.move = True
+    leg = kick(F0.leg, D(2.) * beat(t, period, 2.4), D(3.) * beat(t, period, 3.), D(5.) * beat(t, period, 3.4))        # the legs trail the beat
+    leg_far = kick(F0.leg_far, D(4.) * beat(t, period, .9), D(11.) * beat(t, period, 1.5), D(9.) * beat(t, period, 2.))
+    F = Flyer(xf, seed=seed, beard=beard, arm=arm, arm_far=arm_far, leg=leg, leg_far=leg_far); F.move = True
     lay = lambda fs, singe: lay_feathers(cv, fs, singe, shadow, move=True)
     lay(wing_feathers(F.lead(True), xf, seed + 1, dim=dim_far, Lmax=280, flutter=(t, flutter)), melt.get('singe', 0) * .6)
     F.lay_spar(cv, shadow, far=True); F.lay_body(cv, 'far', shadow); F.lay_straps(cv, far=True)
