@@ -1,7 +1,7 @@
 """Shared pieces for the shots: cached pages, winged figures, gulls, tower and cliff, the Labyrinth, candle, splash, feathers."""
 import os, math
 import numpy as np, cv2
-from collage import (W, H, Canvas, mask, poly, rect_pts, paper, lines_print, gold, slip, rgb, rng, smooth, clip, camera, surface, view)
+from collage import (CAM, W, H, Canvas, mask, poly, rect_pts, paper, lines_print, gold, slip, rgb, rng, smooth, clip, camera, surface, view)
 from figure import (Flyer, POSE, wing_feathers, lay_feathers, feather_pts, feather_tex, FEATHER_PAPERS, wax, xform, lerp, limb_path, SEPIA, CLAY)
 import style_test as ST
 
@@ -16,13 +16,15 @@ def ease(a, b, t):
     return smooth(a, b, t)
 
 
-def cached(name, build, h=H, w=W):
-    """A static page, built once inside a surface of its own size and kept on disk."""
+def cached(name, build, h=H, w=W, scale=1):
+    """A static page, built once inside a surface of its own size and kept on disk.
+    scale 2 builds it at twice the resolution (page coordinates unchanged), for shots that zoom in."""
     p = os.path.join(CACHE, name + '.npy')
-    if os.path.exists(p): return np.load(p)
+    if os.path.exists(p): return np.load(p, mmap_mode='r')
     os.makedirs(CACHE, exist_ok=True)
-    with surface(h, w):
-        cv = Canvas(paper(PAL['page'], 1, mottle=.018, cell=260)(h, w, 0, 0)); build(cv, h, w)
+    with surface(h * scale, w * scale):
+        CAM[:] = [0., 0., float(scale)]
+        cv = Canvas(paper(PAL['page'], 1, mottle=.018, cell=260)(h * scale, w * scale, 0, 0)); build(cv, h, w)
     q = p + '.%d.npy' % os.getpid(); np.save(q, cv.im); os.replace(q, p); return cv.im
 
 
@@ -226,13 +228,25 @@ def masonry(cv, x0, y0, x1, y1, seed, row=46, shade_right=True, hole=None, dim=0
         cv.put(mask(lambda c: (poly(c, sh), c.fill())), lines_print('#3a3128', '#1d1714', seed=seed, pitch=5, ang=70, width=.5, ink=.6), edge='none', opacity=.28, shadow=(0, 0, 0, 0))
 
 
-def cliff(cv, pts, seed, cols=('#9c8a6a', '#b39f7c', '#857458', '#a8936f')):
-    """A cliff of stacked torn layers: pts is the outline, filled downwards in shrinking strata."""
-    r = rng(seed)
-    for i, col in enumerate(cols):
-        q = [(p[0] + i * 34 + r.normal(0, 10), p[1] + i * 70 + r.normal(0, 12)) for p in pts]     # strata stepping down and back
-        cv.put(mask(lambda c, q=q: (poly(c, q), c.fill())), lines_print(col, '#3b3226', seed=seed + i, pitch=5, ang=-15 + i * 9, width=.28, ink=.35) if i % 2 else paper(col, seed + i, mottle=.09),
-               edge='torn', seed=seed + i, amp=8, rim=3)
+def cliff(cv, pts, seed, cols=('#9c8a6a', '#b39f7c', '#857458', '#a8936f', '#94825f')):
+    """A crag: a jagged torn outline, laid in horizontal strata of different papers, with a shaded face."""
+    r = rng(seed); jag = [pts[0]]
+    for p, q in zip(pts, pts[1:]):
+        for u in (.33, .66): jag.append((p[0] + (q[0] - p[0]) * u + r.normal(0, 14), p[1] + (q[1] - p[1]) * u + r.normal(0, 18)))
+        jag.append(q)
+    outline = lambda c: poly(c, jag)
+    cv.put(mask(lambda c: (outline(c), c.fill())), paper(cols[0], seed, mottle=.07), edge='torn', seed=seed, amp=8, rim=3, shadow=(6, 9, 7, .35))
+    top = min(p[1] for p in jag); bot = max(p[1] for p in jag); y = top + r.uniform(30, 60); k = 1
+    while y < bot:
+        hgt = r.uniform(50, 110); yy = y
+        band = ST.wavy(yy, 10, seed + 10 * k, n=12, x0=0, x1=2000) + ST.wavy(yy + hgt, 10, seed + 10 * k + 1, n=12, x0=0, x1=2000)[::-1]
+        col = cols[k % len(cols)]
+        tex = lines_print(col, '#3b3226', seed=seed + k, pitch=5, ang=-12 + 9 * (k % 3), width=.28, ink=.35) if k % 2 else paper(col, seed + k, mottle=.08)
+        cv.put(mask(lambda c, band=band: (c.save(), outline(c), c.clip(), poly(c, band), c.fill(), c.restore())), tex, edge='torn', seed=seed + k, amp=5, rim=2.5, shadow=(3, 5, 4, .3))
+        y += hgt + r.uniform(-10, 25); k += 1
+    xs = [p[0] for p in jag]; cx = (min(xs) + max(xs)) / 2
+    cv.put(mask(lambda c: (c.save(), outline(c), c.clip(), c.rectangle(cx + 120, top - 50, 2000, 3000), c.fill(), c.restore())),
+           lines_print('#2e261d', '#120d09', seed=seed + 99, pitch=5, ang=65, width=.5, ink=.6), edge='none', opacity=.25, shadow=(0, 0, 0, 0))
 
 
 def maze(n, seed):
