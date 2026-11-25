@@ -18,3 +18,4 @@ tools/cmp.py
 !out/.gitkeep
 !dist/.gitkeep
 !qa/.gitkeep
+ikaros/out/
