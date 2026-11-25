@@ -23,7 +23,11 @@ def lp(x, f, order=2): return sosfilt(butter(order, f, 'low', fs=SR, output='sos
 def hp(x, f, order=2): return sosfilt(butter(order, f, 'high', fs=SR, output='sos'), x)
 
 
-def add(t0, sig, pan=0., gain=1., wet=.25):
+INSERT = 7 * SHOT          # the foretelling (s07b) was cut in here: everything written for later shots moves one shot on
+
+
+def add(t0, sig, pan=0., gain=1., wet=.25, raw=False):
+    if not raw and t0 >= INSERT - 1e-6: t0 += SHOT
     i = int(t0 * SR)
     if i >= NS or len(sig) == 0: return
     if i < 0: sig = sig[-i:]; i = 0
@@ -214,6 +218,19 @@ def score():
     y, t0 = aulos([(bar(28, 0), 4 * BEAT, 62, .3), (bar(29, 0), 3.6 * BEAT, 57, .28)], vib=.003); add(t0, y, pan=.2, wet=.45)
 
 
+def foretelling():
+    """S07b, in film time: hushed; a drone, the lyre walking down the Phrygian scale, a chime and a soft drum as each panel is laid."""
+    t0 = INSERT; A = [.45 + 1.05 * k for k in range(4)]
+    add(t0, drone(38, SHOT, .45, fade=1.2), wet=.45, raw=True); add(t0, drone(39, SHOT * .8, .12, fade=1.5), pan=.3, wet=.45, raw=True)
+    for k, (a, m) in enumerate(zip(A, (69, 67, 63, 62))):
+        add(t0 + a, tap(.5), pan=.3, raw=True); add(t0 + a, drum('dum', .3), wet=.3, raw=True)
+        add(t0 + a, kymbala(93 - 3 * k, .25), pan=.5, wet=.6, raw=True); add(t0 + a + .1, lyre(m, 3., .45), pan=-.2, wet=.45, raw=True)
+    add(t0 + A[2] + .2, tear(.4, .2), pan=.4, wet=.3, raw=True)
+    add(t0 + A[3] + .3, sea(1.4, .08), pan=.4, wet=.3, raw=True)
+    add(t0 + 4.55, lyre(50, 3.5, .4) + lyre(57, 3.5, .3), pan=-.2, wet=.5, raw=True)
+    add(t0 + 4.4, sizzle(.9, .03), pan=-.6, raw=True)                         # the candle
+
+
 def effects():
     import importlib
     # the page
@@ -267,17 +284,17 @@ def reverb(x, secs=2.6):
 
 
 if __name__ == '__main__':
-    score(); effects()
+    score(); effects(); foretelling()
     mix = DRY + reverb(WET)
     mix = hp(mix, 30)
     # a gentle compressor (2:1 above -32 dB) that keeps the shape of the piece, loudness to about -18 dB RMS, a soft ceiling
     env = np.sqrt(lp(np.mean(mix ** 2, 0), 6, order=1).clip(1e-12)); th = 10 ** (-32 / 20)
     g = np.where(env > th, (env / th) ** (1 / 2 - 1), 1.); mix = mix * lp(g, 12, order=1)
     # the arc of the piece, in dB per shot: hushed in Crete, building through the flight, loudest as the wing comes apart
-    arc = [-5, -5, -4, -4, -5, -4, -3, -1, 0, 0, 1, 2, 0, -3, -5]
-    centres = [(i + .5) * SHOT for i in range(15)]; tx = np.arange(mix.shape[1]) / SR
+    arc = [-5, -5, -4, -4, -5, -4, -3, -5, -1, 0, 0, 1, 2, 0, -3, -5]
+    centres = [(i + .5) * SHOT for i in range(len(film.SHOTS))]; tx = np.arange(mix.shape[1]) / SR
     mix *= 10 ** (np.interp(tx, centres, arc) / 20)
-    mix *= 10 ** (-16 / 20) / np.sqrt(np.mean(mix[:, int(8 * SHOT * SR):int(12 * SHOT * SR)] ** 2))   # the flight sits at -16 dB
+    mix *= 10 ** (-16 / 20) / np.sqrt(np.mean(mix[:, int(9 * SHOT * SR):int(13 * SHOT * SR)] ** 2))   # the flight sits at -16 dB
     mix = np.tanh(mix / .95) * .95
     end = int(LEN * SR); mix = mix[:, :end]; f = int(.4 * SR); mix[:, -f:] *= np.linspace(1, 0, f)
     out = os.path.join(HERE, 'out', 'score.wav'); os.makedirs(os.path.dirname(out), exist_ok=True)

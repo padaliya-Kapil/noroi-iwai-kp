@@ -15,6 +15,7 @@ STORY = [
     ('s06', 'A wing is built on its reed, feather by feather, each root pressed into wax.'),
     # IV.  The warning
     ('s07', 'Daidalos straps on the boy\'s wings and warns him: the sun above, the sea below; keep to the middle.'),
+    ('s07b', 'The foretelling: by candlelight he shows the boy the future painted on a vase: the climb, the running wax, the fall, the feathers on the sea.'),
     # V.  Flight
     ('s08', 'From the top of the tower they leap; the wings catch, and they rise past the camera.'),
     ('s09', 'Over the Aegean: islands slide by in layers, gulls keep pace; father and son fly side by side.'),
@@ -30,4 +31,4 @@ STORY = [
 SHOTS = [(s, i * 2 * BAR, 2 * BAR) for i, (s, _) in enumerate(STORY)]
 START = {s: a for s, a, n in SHOTS}
 LEN = {s: n for s, a, n in SHOTS}
-N = SHOTS[-1][1] + SHOTS[-1][2]            # 1920 frames, 80 s
+N = SHOTS[-1][1] + SHOTS[-1][2]            # 2048 frames, 85.3 s

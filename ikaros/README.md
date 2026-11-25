@@ -1,7 +1,7 @@
 # ΙΚΑΡΟΣ (Ikaros)
 
-An 80-second collage film of the Icarus myth, drawn, animated and scored entirely in code: no image files, no fonts, no samples, no found images.
-1920×1080, 24 fps, drawn on twos (12 drawings a second), 15 shots of two bars each at 90 BPM. The score is instrumental.
+An 85-second collage film of the Icarus myth, drawn, animated and scored entirely in code: no image files, no fonts, no samples, no found images.
+1920×1080, 24 fps, drawn on twos (12 drawings a second), 16 shots of two bars each at 90 BPM. The score is instrumental.
 
 The look is a paper collage: Attic black-figure puppets cut from black paper with incisions to the clay colour and brass fasteners at the joints,
 torn and scissor-cut papers (parchment, bone, stone blue, fired clay, sepia engraving, an indigo sea), and gold leaf for the sun alone.
@@ -17,6 +17,7 @@ torn and scissor-cut papers (parchment, bone, stone blue, fired clay, sepia engr
 | s05 | The workbench by candlelight: feathers sorted into rows, smallest to largest |
 | s06 | A wing built on its reed, feather by feather, each root pressed into wax |
 | s07 | The warning: the sun above, the sea below, keep to the middle |
+| s07b | The foretelling: by candlelight, the future painted on a vase (the climb, the running wax, the fall, feathers on the sea); a hand on the boy's shoulder |
 | s08 | They leap from the tower and rise |
 | s09 | Over the Aegean, islands sliding by, gulls alongside |
 | s10 | Ikaros climbs towards a growing sun; Daidalos below |

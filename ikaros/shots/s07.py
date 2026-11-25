@@ -2,7 +2,7 @@
 from functools import lru_cache
 from shotkit import *
 
-DA = (700, 650, D(-90), 1.0); IK = (1210, 650, D(-90), 1.0, True)
+DA = (700, 650, D(-90), 1.0); IK = (1210, 712, D(-90), .76, True)                                        # the boy: a head shorter than his father
 UP = dict(POSE['stand'], turn=math.pi / 2 - .5); DOWN = dict(POSE['stand'], turn=math.pi / 2 + .45)
 
 
