@@ -5,15 +5,34 @@ Local frame of a flyer: +x runs from the feet to the head, +y is the belly side.
 """
 import math
 import numpy as np
-from collage import mask, poly, paper, halftone, lines_print, slip, brass, rgb, rng, smooth, clip
+from collage import mask, poly, paper, halftone, lines_print, slip, brass, gold, rgb, rng, smooth, clip
 
 CLAY = '#b4643c'                                                                # the fired clay that incisions show
 SEPIA = '#4a3a2b'
 
 
 def xform(xf, p):
-    x, y, a, k = xf; ca, sa = math.cos(a), math.sin(a)
-    return (x + k * (p[0] * ca - p[1] * sa), y + k * (p[0] * sa + p[1] * ca))
+    x, y, a, k = xf[:4]; ca, sa = math.cos(a), math.sin(a); py = -p[1] if len(xf) > 4 and xf[4] else p[1]
+    return (x + k * (p[0] * ca - py * sa), y + k * (p[0] * sa + py * ca))
+
+
+# poses in the local frame (+x feet to head, +y the belly side).  Stand a figure up with xf angle -90 deg (mirror to face left).
+POSE = dict(
+    fly=dict(arm=((132, -18), (150, -104), (226, -150)), arm_far=((124, -22), (132, -108), (200, -162)),
+             leg=((2, 10), (-118, 24), (-232, 20), (-288, 34)), leg_far=((-4, 4), (-110, 34), (-176, -46), (-218, -82))),
+    stand=dict(arm=((134, -6), (52, 4), (-26, 20)), arm_far=((128, -12), (48, -6), (-28, 8)),
+               leg=((2, 12), (-118, 14), (-234, 8), (-244, 58)), leg_far=((-2, 2), (-118, 0), (-234, -6), (-246, 44)), turn=math.pi / 2),
+    point_up=dict(arm=((134, -6), (204, 24), (282, 34)), arm_far=((128, -12), (52, -2), (-24, 10)),
+                  leg=((2, 12), (-118, 18), (-234, 14), (-244, 64)), leg_far=((-2, 2), (-116, -16), (-230, -34), (-244, 14)), turn=math.pi / 2 - .5),
+    point_down=dict(arm=((134, -6), (92, 64), (24, 110)), arm_far=((128, -12), (52, -2), (-24, 10)),
+                    leg=((2, 12), (-118, 18), (-234, 14), (-244, 64)), leg_far=((-2, 2), (-116, -16), (-230, -34), (-244, 14)), turn=math.pi / 2 + .45),
+    reach=dict(arm=((134, -6), (176, 70), (230, 140)), arm_far=((128, -12), (166, 60), (214, 130)),
+               leg=((2, 12), (-118, 14), (-234, 8), (-244, 58)), leg_far=((-2, 2), (-118, 0), (-234, -6), (-246, 44)), turn=math.pi / 2 + .2),
+    seated=dict(arm=((134, -6), (80, 50), (60, 130)), arm_far=((128, -12), (76, 40), (58, 120)),
+                leg=((2, 12), (2, 132), (-112, 140), (-118, 186)), leg_far=((-2, 2), (-4, 124), (-116, 128), (-122, 174)), turn=math.pi / 2 + .35),
+    fall=dict(arm=((132, -18), (200, -70), (250, -20)), arm_far=((124, -22), (150, -110), (120, -190)),
+              leg=((2, 10), (-100, 60), (-200, 20), (-240, 50)), leg_far=((-4, 4), (-90, -50), (-170, -10), (-210, -40)), turn=.3),
+)
 
 
 def limb_path(c, a, b, wa, wb):
@@ -116,7 +135,7 @@ def feather_tex(kind, col, seed):
 
 
 def wing_feathers(lead, xf, seed, rows=((1., 17, 0), (.56, 15, 1), (.3, 12, 2)), a0=(-1., .12), a1=(-.78, -.62), Lmin=95, Lmax=300,
-                  skip=(), loose=(), dim=0., flutter=None):
+                  skip=(), loose=(), dim=0., flutter=None, shed=0.):
     """Feathers laid along a leading edge (shoulder, elbow, wrist, tip).  Returns [(mask, tex, quill mask, seed, singe)] bottom first."""
     seg = [math.dist(lead[i], lead[i + 1]) for i in range(len(lead) - 1)]; tot = sum(seg)
     def at(t):
@@ -132,6 +151,8 @@ def wing_feathers(lead, xf, seed, rows=((1., 17, 0), (.56, 15, 1), (.3, 12, 2)),
         for i in range(n)[::-1]:
             t = (i + .5) / n if row else i / (n - 1) * .97 + .02
             if row == 0 and i in skip: continue
+            if row and shed and (i + .5) / n > 1 - shed * (1.15 - .3 * row): continue   # coverts shed from the tip inwards
+            r = rng(seed * 1009 + row * 101 + i)                                # each feather its own paper, whatever else is skipped
             L = (Lmin + (Lmax - Lmin) * t ** .9) * (1 - .38 * smooth(.86, 1., t)) * k
             ang = g0 + (g1 - g0) * t ** 1.15 + r.normal(0, .035)
             if flutter:                                                        # (time s, radians): tips and loose feathers shake most
@@ -157,10 +178,15 @@ def lay_feathers(cv, feathers, singe_tip=0., shadow=(5, 7, 4., .3), move=False):
 
 # ----------------------------------------------------------------------------------------------- the flyer
 class Flyer:
-    def __init__(self, xf, seed=0, beard=False, arm=((132, -18), (150, -104), (226, -150)), arm_far=((124, -22), (132, -108), (200, -162)),
-                 leg=((2, 10), (-118, 24), (-232, 20), (-288, 34)), leg_far=((-4, 4), (-110, 34), (-176, -46), (-218, -82))):
+    def __init__(self, xf, seed=0, beard=False, arm=None, arm_far=None, leg=None, leg_far=None, pose='fly', turn=None, dress=None, crown=False):
+        """pose names a POSE; arm/leg arguments override it.  turn: how far the head turns from looking along the body (rad).
+        dress: None | 'chiton' (short tunic) | 'robe' (to the ankles)."""
+        P = POSE[pose]
         self.xf, self.seed, self.beard, self.move = xf, seed, beard, False
-        self.arm, self.arm_far, self.leg, self.leg_far = arm, arm_far, leg, leg_far
+        self.arm, self.arm_far = arm or P['arm'], arm_far or P['arm_far']
+        self.leg, self.leg_far = leg or P['leg'], leg_far or P['leg_far']
+        self.turn = P.get('turn', 0.) if turn is None else turn
+        self.dress, self.crown = dress, crown
 
     def M(self, draw):
         return mask(draw, self.xf)
@@ -219,8 +245,12 @@ class Flyer:
             c.move_to(10, 26); c.curve_to(20, 14, 34, 8, 48, 12); c.stroke()
         return self.M(body), self.M(inc)
 
+    def head_frame(self, c):
+        u = self.turn / (math.pi / 2); c.translate(190 + 8 * u, -14 + 12 * u); c.rotate(self.turn); c.translate(-190, 14)
+
     def head(self):
         def h(c):
+            self.head_frame(c)
             c.arc(190, -14, 27, 0, 2 * math.pi); c.fill()
             c.move_to(200, -40); c.curve_to(214, -38, 220, -28, 222, -18); c.line_to(236, -4); c.line_to(226, -1)
             c.curve_to(229, 3, 226, 6, 224, 7); c.curve_to(228, 10, 226, 14, 222, 15); c.curve_to(224, 22, 216, 24, 208, 22)
@@ -229,6 +259,7 @@ class Flyer:
             if self.beard:
                 c.move_to(222, 6); c.curve_to(228, 22, 222, 38, 206, 44); c.curve_to(196, 34, 190, 24, 188, 12); c.close_path(); c.fill()
         def inc(c):
+            self.head_frame(c)
             c.set_line_width(1.6); c.save(); c.translate(211, -14); c.scale(1, .5); c.arc(0, 0, 6.5, 0, 2 * math.pi); c.restore(); c.stroke()
             c.arc(212, -14, 1.8, 0, 2 * math.pi); c.fill()
             c.move_to(200, -27); c.curve_to(207, -30, 214, -28, 218, -24); c.stroke()
@@ -237,6 +268,27 @@ class Flyer:
             if self.beard:
                 for i in range(4): c.move_to(218 - i * 6, 14 + i * 2); c.curve_to(216 - i * 6, 26, 212 - i * 5, 34, 206 - i * 4, 40); c.stroke()
         return self.M(h), self.M(inc)
+
+    def crown_piece(self):
+        def cr(c):
+            self.head_frame(c)
+            pts = [(168, -34), (214, -36)] + [(214 - i * 7.7 + (3.8 if i % 2 else 0), -58 if i % 2 == 0 else -46) for i in range(7)]
+            poly(c, [(166, -30), (216, -32), (216, -40)] + [(216 - i * 8.3, -62 if i % 2 == 0 else -46) for i in range(7)] + [(166, -40)]); c.fill()
+        return self.M(cr)
+
+    def dress_piece(self):
+        """The garment, in added purple-red as on the vases, with incised folds and a dotted hem."""
+        hem = -100 if self.dress == 'chiton' else -238; fl = 14 if self.dress == 'chiton' else 34
+        outline = [(156, -30), (150, 40), (100, 42), (40, 44), (hem, 48 + fl), (hem - 6, 10), (hem, -40 - fl), (40, -38), (100, -36)]
+        def body(c): poly(c, outline); c.fill()
+        def inc(c):
+            c.set_line_width(1.5)
+            for f in (-.6, -.25, .1, .45, .8):
+                y0 = 2 + f * 34; y1 = 4 + f * (44 + fl); curve(c, [(58, y0), ((58 + hem) / 2, (y0 + y1) / 2 + 3), (hem + 6, y1)])
+            c.set_line_width(5); c.move_to(70, -40); c.line_to(70, 44); c.stroke()                          # belt
+            c.set_line_width(1.6)
+            for i in range(14): c.new_sub_path(); c.arc(hem + 10, -38 - fl * .8 + i * (86 + fl * 1.6) / 13, 2.2, 0, 2 * math.pi); c.stroke()
+        return self.M(body), self.M(inc)
 
     def joints(self):
         k = self.xf[3]
@@ -251,6 +303,11 @@ class Flyer:
             parts = self.leg_parts(False) + [self.torso(), self.head()]
             for i, (m, inc) in enumerate(parts):
                 cv.put(m, slip(s + 10 + i), edge='cut', seed=s + 60 + i, shadow=shadow, marks=[(inc, CLAY, .92)] if inc is not None else [], move=self.move)
+            if self.dress:
+                m, inc = self.dress_piece()
+                cv.put(m, paper('#6b2a20', s + 90, mottle=.07), edge='cut', seed=s + 90, shadow=(4, 6, 4, .35), marks=[(inc, '#1d1612', .8)], move=self.move)
+            if self.crown:
+                cv.put(self.crown_piece(), gold(seed=s + 91), edge='cut', seed=s + 91, shadow=(2, 4, 3, .4), move=self.move)
 
     def lay_arm(self, cv, shadow):
         for i, (m, inc) in enumerate(self.arm_parts(False)):

@@ -9,6 +9,28 @@ import numpy as np, cv2, cairo
 
 W, H = 1920, 1080
 f32 = np.float32
+CAM = [0., 0., 1.]       # camera over the page: screen = (page - (x, y)) * s.  Pieces are drawn in page coordinates.
+SIZE = [H, W]            # the surface masks are drawn on: the screen, or a larger page being built
+
+
+class camera:
+    """with camera(x, y, s): ...  draws in page coordinates seen through a camera."""
+    def __init__(self, x=0., y=0., s=1.): self.v = [float(x), float(y), float(s)]
+    def __enter__(self): self.old = CAM[:]; CAM[:] = self.v
+    def __exit__(self, *a): CAM[:] = self.old
+
+
+class surface:
+    """with surface(h, w): ...  build a page larger than the screen (camera at rest)."""
+    def __init__(self, h, w): self.v = [h, w]
+    def __enter__(self): self.old = SIZE[:], CAM[:]; SIZE[:] = self.v; CAM[:] = [0., 0., 1.]
+    def __exit__(self, *a): SIZE[:], CAM[:] = self.old
+
+
+def view(page, x, y, s=1.):
+    """The screen's view of a pre-built page through the camera."""
+    A = np.float32([[s, 0, -x * s], [0, s, -y * s]])
+    return cv2.warpAffine(page, A, (W, H), flags=cv2.INTER_LINEAR if s == 1 else cv2.INTER_AREA if s < 1 else cv2.INTER_CUBIC, borderMode=cv2.BORDER_REFLECT)
 
 
 def rgb(h):
@@ -39,8 +61,11 @@ def noise(h, w, cell, seed, octaves=3):
     return out / (.85 * math.sqrt(var))                                       # fixed scale, so a small crop is not stretched
 
 
-def grid(h, w, y0=0, x0=0):
-    return np.meshgrid(np.arange(w, dtype=f32) + x0, np.arange(h, dtype=f32) + y0)
+def grid(h, w, y0=None, x0=None):
+    """Pixel grid; with an origin, in page coordinates (through the camera), so printed patterns stay on the page."""
+    if y0 is None: return np.meshgrid(np.arange(w, dtype=f32), np.arange(h, dtype=f32))
+    ox, oy, s = CAM
+    return np.meshgrid((np.arange(w, dtype=f32) + x0) / s + ox, (np.arange(h, dtype=f32) + y0) / s + oy)
 
 
 def sdist(m):
@@ -50,12 +75,15 @@ def sdist(m):
 
 
 # ----------------------------------------------------------------------------------------------- masks
-def mask(draw, xf=None, h=H, w=W):
+def mask(draw, xf=None, h=None, w=None):
     """Run draw(ctx) on an empty alpha surface; xf = (x, y, angle_rad, scale) places a local frame first."""
+    h = h or SIZE[0]; w = w or SIZE[1]
     s = cairo.ImageSurface(cairo.FORMAT_A8, w, h); c = cairo.Context(s)
     c.set_source_rgba(0, 0, 0, 1); c.set_line_join(cairo.LINE_JOIN_ROUND); c.set_line_cap(cairo.LINE_CAP_ROUND)
+    if CAM != [0., 0., 1.]:
+        c.scale(CAM[2], CAM[2]); c.translate(-CAM[0], -CAM[1])
     if xf:
-        c.translate(xf[0], xf[1]); c.rotate(xf[2]); c.scale(xf[3], xf[3])
+        c.translate(xf[0], xf[1]); c.rotate(xf[2]); c.scale(xf[3], -xf[3] if len(xf) > 4 and xf[4] else xf[3])   # xf[4]: mirrored
     draw(c); s.flush()
     return np.ndarray((h, s.get_stride()), np.uint8, s.get_data())[:, :w].astype(f32) / 255.
 
@@ -165,7 +193,7 @@ def brass(cx, cy, r):
 class Canvas:
     def __init__(self, base, jitter=0., drawing=0):
         """jitter: how far (px) a hand-placed piece lands off its mark on each drawing, for pieces put with move=True."""
-        self.im = base.astype(f32); self.jit, self.drawing = jitter, drawing
+        self.im = base.astype(f32); self.jit, self.drawing = jitter, drawing; self.h, self.w = self.im.shape[:2]
 
     def put(self, m, tex, edge='torn', seed=0, amp=6., rim=3.5, rim_col='#f6f0e2', shadow=(4, 6, 4., .32), opacity=1.,
             marks=(), singe=0., wobble=1.2, move=False):
@@ -175,13 +203,13 @@ class Canvas:
             x, y, w, h = cv2.boundingRect((m > .01).astype(np.uint8))
             if w:
                 cx, cy = x + w / 2., y + h / 2.; A = cv2.getRotationMatrix2D((cx, cy), j[2] * .4, 1.); A[:, 2] += j[:2]
-                m = cv2.warpAffine(m, A, (W, H))
-                marks = [(cv2.warpAffine(mk, A, (W, H)), c, a) for mk, c, a in marks]
+                m = cv2.warpAffine(m, A, (self.w, self.h))
+                marks = [(cv2.warpAffine(mk, A, (self.w, self.h)), c, a) for mk, c, a in marks]
         x, y, w, h = cv2.boundingRect((m > .01).astype(np.uint8))
         if w == 0: return
         dx, dy, sb, ss = shadow
         pad = int(amp * 3 + rim + sb * 3 + max(abs(dx), abs(dy)) + 6)
-        x0, y0, x1, y1 = max(x - pad, 0), max(y - pad, 0), min(x + w + pad, W), min(y + h + pad, H)
+        x0, y0, x1, y1 = max(x - pad, 0), max(y - pad, 0), min(x + w + pad, self.w), min(y + h + pad, self.h)
         mc = m[y0:y1, x0:x1]; hh, ww = mc.shape
         if edge == 'none':
             body = outer = mc
@@ -217,11 +245,11 @@ class Canvas:
         self.im[y0:y1, x0:x1] = im * (1 - ba) + t * ba
 
     def finish(self, seed=0, vig=.13, grain=.018, warm=(1.02, 1., .965), desat=0., flicker=0.):
-        X, Y = grid(H, W)
-        r = np.hypot((X - W * .55) / (W * .62), (Y - H * .45) / (H * .7))
+        X, Y = grid(self.h, self.w)
+        r = np.hypot((X - self.w * .55) / (self.w * .62), (Y - self.h * .45) / (self.h * .7))
         im = self.im * (1 - vig * smooth(.35, 1.25, r))[..., None] * np.array(warm, f32)
         if flicker: im = im * (1 + flicker * rng(self.drawing + 555).normal())
         if desat: im = im * (1 - desat) + (im @ np.array([.3, .59, .11], f32))[..., None] * desat
-        g = cv2.GaussianBlur(rng(seed + self.drawing * 101).standard_normal((H, W)).astype(f32), (0, 0), .6)
+        g = cv2.GaussianBlur(rng(seed + self.drawing * 101).standard_normal((self.h, self.w)).astype(f32), (0, 0), .6)
         im = im * (1 + grain * g / g.std())[..., None]
         return (clip(im) ** (1 / 1.0) * 255 + .5).astype(np.uint8)

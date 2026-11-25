@@ -1,22 +1,50 @@
-# ΙΚΑΡΟΣ (Ikaros): style test
+# ΙΚΑΡΟΣ (Ikaros)
 
-A collage film of the Icarus myth, drawn entirely in code: no image files, no fonts, no found images. The score will be instrumental.
+An 80-second collage film of the Icarus myth, drawn, animated and scored entirely in code: no image files, no fonts, no samples, no found images.
+1920×1080, 24 fps, drawn on twos (12 drawings a second), 15 shots of two bars each at 90 BPM. The score is instrumental.
 
-`style_test.jpg` is the first frame of the look: Ikaros at the sun, the wax running, Daidalos lower and level.
+The look is a paper collage: Attic black-figure puppets cut from black paper with incisions to the clay colour and brass fasteners at the joints,
+torn and scissor-cut papers (parchment, bone, stone blue, fired clay, sepia engraving, an indigo sea), and gold leaf for the sun alone.
 
-Palette: parchment and bone papers, faded stone blue, fired clay, black slip, sepia engraving, an indigo sea, and gold leaf for the sun alone. Wings are bound to a reed spar along each arm with leather straps and a chest harness; the feather roots are set in wax.
+## The story
 
-In motion the page (sky, rays, island, sun, the sea's sheets) is glued down and still. Everything animated is re-placed by hand each drawing, landing a fraction of a pixel off its mark; papers keep their grain as they move, and the exposure flickers slightly. Both flyers beat their wings and bob, feathers flutter (the loose ones most), the wax drips lengthen and let drops fall, one primary tears free of Ikaros's wing, cut feathers rock down to the sea, and the rows of wave crests slide against each other.
+| Shot | |
+|---|---|
+| s01 | Title: the sun set in, the label laid, the letters ΙΚΑΡΟΣ dropped one by one |
+| s02 | King Minos watches the Labyrinth laid wall by wall; Daidalos sets the walls |
+| s03 | The tower on its cliff; the camera climbs to the window where father and son are held |
+| s04 | A gull's feather drifts in; Ikaros catches it; Daidalos has the idea |
+| s05 | The workbench by candlelight: feathers sorted into rows, smallest to largest |
+| s06 | A wing built on its reed, feather by feather, each root pressed into wax |
+| s07 | The warning: the sun above, the sea below, keep to the middle |
+| s08 | They leap from the tower and rise |
+| s09 | Over the Aegean, islands sliding by, gulls alongside |
+| s10 | Ikaros climbs towards a growing sun; Daidalos below |
+| s11 | At the sun: the wax runs, feathers tear free |
+| s12 | Close against the gold: the wing comes apart |
+| s13 | The fall; the page itself comes apart into the dark |
+| s14 | The splash; feathers settle on the water |
+| s15 | Daidalos alone; the name is torn in two; the dark comes down |
+
+## Build
+
+```bash
+pip install numpy opencv-python-headless scipy pillow pycairo     # and ffmpeg on the PATH
+python ikaros/render.py all --jobs 4      # each shot to ikaros/out/shots/<id>.mp4 (static pages are cached in ikaros/out/cache)
+python ikaros/music.py                    # the score and effects to ikaros/out/score.wav
+python ikaros/render.py --assemble        # picture and sound to ikaros/dist/ikaros.mp4
+python ikaros/render.py s07 --preview 0,20,40   # a contact sheet of some drawings of one shot
+```
+
+## What is where
 
 | File | What it does |
 |---|---|
-| `collage.py` | The paper kit: torn and scissor-cut edges, paper with fibres, halftone and engraved prints, gold leaf, black-figure paper, brass fasteners, shadows of pieces lifted off the page |
-| `figure.py` | Black-figure puppets (limbs as separate pieces on brass fasteners, details incised to the clay colour), wings of single cut-paper feathers, wax |
-| `style_test.py` | The test composition |
-| `motion_test.py` | Three seconds of it as stop motion: 36 drawings at 12 a second, each held two frames at 24 fps → `motion_test.mp4` |
-
-```bash
-pip install numpy opencv-python-headless scipy pillow pycairo
-python ikaros/style_test.py            # writes ikaros/out/style_test.png, about 6 s
-python ikaros/motion_test.py --jobs 4  # writes ikaros/motion_test.mp4, about 1 min on 4 cores (needs ffmpeg)
-```
+| `film.py` | The timeline and the story, shot by shot |
+| `collage.py` | The paper kit: torn and cut edges, papers, engraving, halftone, gold leaf, black-figure paper, shadows, a camera over larger pages, hand-placed jitter |
+| `figure.py` | Black-figure puppets: modelled limbs, poses, turning heads, tunic and robe, crown; wings of cut-paper feathers on a reed, wax |
+| `shotkit.py` | Shared pieces: winged and wingless figures, gulls, stone walls, cliff, the Labyrinth, candle and glow, splash, falling feathers, sea, sun, label |
+| `shots/` | One module per shot: a cached static page and `draw(d)` for drawing d |
+| `music.py` | Lyre, aulos, frame drum, finger cymbals, drone, and the sounds of paper, wings, wax, wind, sea and splash, timed from the shots |
+| `render.py` | Parallel rendering, previews, assembly |
+| `style_test.py`, `motion_test.py` | The first still and the three-second motion test |
